@@ -1,7 +1,6 @@
 import os
 import time
 import random
-import hashing
 from datetime import datetime, timedelta
 from dateutil import parser
 from dotenv import load_dotenv
