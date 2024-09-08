@@ -7,7 +7,7 @@ from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 
-SLEEP_INTERVAL = 30
+SLEEP_INTERVAL = 20
 HIVE_API = 'https://api.hive.blog'
 hive = Hive()
 

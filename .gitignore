@@ -6,3 +6,4 @@
 
 # Ignore a specific folder
 /ignore/
+__pycache__

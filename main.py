@@ -7,7 +7,7 @@ from resumption import load_last_block, save_last_block
 from reminder_handler import process_reminders
 
 # Configuration
-BLOCK_RANGE = 20
+BLOCK_RANGE = 50
 QUIT_TIMEOUT = 30  # 30 seconds timeout for quitting on error
 
 def quit_if_timeout():
