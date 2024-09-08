@@ -1,0 +1,8 @@
+# Ignore all .env files (commonly used to store environment variables)
+.env
+
+# Ignore all .log files
+*.log
+
+# Ignore a specific folder
+/ignore/
