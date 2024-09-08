@@ -23,4 +23,6 @@ scrypt==0.8.24
 six==1.16.0
 urllib3==2.2.2
 wcwidth==0.2.13
+cryptography==3.4.8
+pycryptodome>=0.1
 websocket-client==1.8.0
