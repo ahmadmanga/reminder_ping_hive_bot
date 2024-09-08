@@ -17,7 +17,6 @@ python-dotenv==1.0.1
 pytz==2024.1
 bcc>=0.1
 requests==2.32.3
-pycryptodomex==3.18.0
 bcrypt==3.2.0
 ruamel.yaml==0.18.6
 ruamel.yaml.clib==0.2.8
