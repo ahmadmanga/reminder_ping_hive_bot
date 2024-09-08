@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+import hashing
 from listener import listen_for_comments, get_latest_block_num, load_blacklist
 from reply import handle_new_comment
 from resumption import load_last_block, save_last_block
