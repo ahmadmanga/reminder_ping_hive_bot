@@ -8,7 +8,11 @@ import os
 from dotenv import load_dotenv
 
 SLEEP_INTERVAL = 20
-HIVE_API = 'https://api.hive.blog'
+HIVE_API = [ 
+    'https://api.hive.blog', 
+    'https://api.deathwing.me',
+    'https://api.openhive.network'
+]
 hive = Hive()
 
 # Load environment variables
@@ -29,20 +33,23 @@ def get_latest_block_num():
         "id": 1
     }
     retries = 10
+    api_index = 0
     while retries > 0:
         try:
-            response = requests.post(HIVE_API, json=data).json()
+            response = requests.post(HIVE_API[api_index % len(HIVE_API)], json=data).json()
             result = response.get('result')
             if result:
                 return result['head_block_number']
             else:
-                print("Failed to get latest block number. Retrying...")
+                print(f"Failed to get latest block number from {HIVE_API[api_index % len(HIVE_API)]}. Retrying...")
                 time.sleep(SLEEP_INTERVAL / 10)
                 retries -= 1
+                api_index += 1  # Switch to the next API on each retry
         except Exception as e:
-            print(f"Exception while fetching latest block number: {e}")
+            print(f"Exception while fetching latest block number from {HIVE_API[api_index % len(HIVE_API)]}: {e}")
             time.sleep(SLEEP_INTERVAL / 10)
             retries -= 1
+            api_index += 1  # Switch to the next API on each retry
 
     print("Max retries exceeded. Aborting.")
     raise Exception("Failed to fetch latest block number after multiple retries.")
@@ -64,21 +71,24 @@ def get_block_range(start_block, end_block):
         "id": 1
     }
     retries = 10
+    api_index = 0
     while retries > 0:
         try:
-            response = requests.post(HIVE_API, json=data).json()
+            response = requests.post(HIVE_API[api_index % len(HIVE_API)], json=data).json()
             result = response.get('result')
             if result['blocks']:
-                print(f"Fetched block range {start_block} to {end_block}")
+                print(f"Fetched block range {start_block} to {end_block} from {HIVE_API[api_index % len(HIVE_API)]}")
                 return result['blocks']
             else:
-                print(f"Failed to fetch block range {start_block} to {end_block}. Retrying...")
+                print(f"Failed to fetch block range {start_block} to {end_block} from {HIVE_API[api_index % len(HIVE_API)]}. Retrying...")
                 time.sleep(SLEEP_INTERVAL)
                 retries -= 1
+                api_index += 1  # Switch to the next API on each retry
         except Exception as e:
-            print(f"Exception while fetching block range {start_block} to {end_block}: {e}")
+            print(f"Exception while fetching block range {start_block} to {end_block} from {HIVE_API[api_index % len(HIVE_API)]}: {e}")
             time.sleep(SLEEP_INTERVAL)
             retries -= 1
+            api_index += 1  # Switch to the next API on each retry
 
     print("Max retries exceeded. Aborting.")
     raise Exception("Failed to fetch block data after multiple retries.")

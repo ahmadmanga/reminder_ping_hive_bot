@@ -9,16 +9,21 @@ from beem import Hive
 from beem.comment import Comment
 from beem.exceptions import ContentDoesNotExistsException
 
+# Load environment variables
 load_dotenv()
 
 HIVE_USER = os.getenv('HIVE_USERNAME')
 HIVE_POSTING_KEY = os.getenv('POSTING_KEY')
-MONGO_URI = os.getenv('MONGO_URI')  # Ensure you have this in your .env file
+MONGO_URI = os.getenv('MONGO_URI')
 DEFAULT_REMIND_NOTIFICATION = "Attention @{author}!! Here's your reminder to check back on this conversation!"
 DEFAULT_FOOTER = ""
 
-# Initialize Hive instance
-hive = Hive(keys=[HIVE_POSTING_KEY], node='https://api.hive.blog')
+# List of Hive API nodes
+HIVE_API_NODES = [
+    'https://api.hive.blog',
+    'https://api.deathwing.me',
+    'https://api.openhive.network'
+
 
 # Initialize MongoDB client
 client = MongoClient(MONGO_URI)
@@ -29,12 +34,17 @@ reply_text_collection = db.get_collection('reply_text')
 def get_random_text(type):
     """Fetch a random text from the 'reply_text' collection based on the type."""
     try:
-    	documents = list(reply_text_collection.find({'type': type}))
-    	if documents:
+        documents = list(reply_text_collection.find({'type': type}))
+        if documents:
             return random.choice(documents)['text']
     except errors.PyMongoError as e:
         print(f"Database error: {e}")
     return None
+
+def initialize_hive_client(api_index=0):
+    """Initialize the Hive client with a specific API node."""
+    hive = Hive(keys=[HIVE_POSTING_KEY], node=HIVE_API_NODES[api_index % len(HIVE_API_NODES)])
+    return hive
 
 def process_reminders():
     """Process the reminders and reply to comments when their time is up."""
@@ -68,11 +78,14 @@ def process_reminders():
         else:
             remaining_reminders.append(reminder)
 
-def reply_comment(reminder, max_retries=3):
+def reply_comment(reminder, api_index=0, max_retries=3):
     """Reply to the comment indicating the reminder is due, with retry logic on failure."""
     attempts = 0
     while attempts < max_retries:
         try:
+            # Initialize Hive client
+            hive = initialize_hive_client(api_index)
+
             # Create the comment object using author and permlink
             authorperm = f"@{reminder['author']}/{reminder['permlink']}"
             print(authorperm)
@@ -97,13 +110,11 @@ def reply_comment(reminder, max_retries=3):
             # Post the reply
             comment.reply(reply_body, author=HIVE_USER)
             print(f"Replied with comment: {reminder['permlink']}")
-            
-            
+
             # Remove the reminder from reminders
             reminders_collection.delete_one({'_id': reminder['_id']})
 
             # Wait for 3 seconds to avoid overloading the blockchain with transactions
-            
             time.sleep(3)
 
             # Exit the loop after a successful reply
@@ -120,12 +131,15 @@ def reply_comment(reminder, max_retries=3):
                 print(f"Failed to reply after {max_retries} attempts.")
             else:
                 time.sleep(2)  # Wait before retrying
-        
-        
+
+        if attempts >= max_retries and api_index < len(HIVE_API_NODES) - 1:
+            print("Falling back to next API node...")
+            reply_comment(reminder, api_index + 1, max_retries)
+        elif attempts >= max_retries:
+            print("Failed to reply with all API nodes.")
+
 def time_ago(past_time, current_time=None):
     """Return a human-readable 'x ago' string."""
-    
-    # Parse input times if they are strings
     if isinstance(past_time, str):
         past_time = parser.parse(past_time)
         
@@ -134,10 +148,8 @@ def time_ago(past_time, current_time=None):
     elif isinstance(current_time, str):
         current_time = parser.parse(current_time)
 
-    # Calculate the difference between current and past time
     delta = current_time - past_time
 
-    # Generate human-readable output based on time difference
     if delta < timedelta(minutes=1):
         return "just now"
     elif delta < timedelta(hours=1):

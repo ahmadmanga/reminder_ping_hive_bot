@@ -16,12 +16,23 @@ HIVE_USER = os.getenv('HIVE_USERNAME')
 HIVE_POSTING_KEY = os.getenv('POSTING_KEY')
 MONGO_URI = os.getenv('MONGO_URI')
 
-# Hive and MongoDB clients
-hive = Hive(keys=[HIVE_POSTING_KEY], node='https://api.hive.blog')
+# List of Hive API nodes
+HIVE_API_NODES = [
+    'https://api.hive.blog',
+    'https://api.deathwing.me',
+    'https://api.openhive.network'
+]
+
+# MongoDB client
 client = MongoClient(MONGO_URI)
 db = client['reminder_bot']
 upcoming_reminders = db['reminders']
 users_collection = db['list_of_users']
+
+def initialize_hive_client(api_index=0):
+    """Initialize the Hive client with a specific API node."""
+    hive = Hive(keys=[HIVE_POSTING_KEY], node=HIVE_API_NODES[api_index % len(HIVE_API_NODES)])
+    return hive
 
 def handle_new_comment(comment):
     """Handle new comments, check for !RemindMe and reply if necessary."""
@@ -40,7 +51,7 @@ def handle_new_comment(comment):
                 except Exception as e:
                     print(f"Error formatting remind_notification: {e}")
                 
-                reply_to_comment(comment, reply_body)
+                reply_to_comment(initialize_hive_client(), comment, reply_body)
             else:
                 reply_with_error(comment)
         else:
@@ -61,7 +72,7 @@ def calculate_target_timestamp(block_timestamp, time_string):
     time_string = time_string.lower().strip()
         
     # Stage 1: Manual parsing for "in {number} {unit}" pattern
-    match = re.match(r'(?:in\s+)?(\d+)\s*(second[s]?|minute[s]?|hour[s]?|day[s]?|week[s]?)', time_string)
+    match = re.match(r'\bon(?:\s+the)?\s+(?:(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:of\s+)?(\w+)))?,?\s*(\d{4})?', time_string)
     if match:
         amount = int(match.group(1))
         unit = match.group(2)
@@ -84,17 +95,15 @@ def calculate_target_timestamp(block_timestamp, time_string):
         block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
         target_timestamp = block_timestamp + delta
 
-        return block_timestamp + delta
+        return target_timestamp
     
     # Stage 2: Parsing with dateutil.parser
     elif re.search(r'\bon(?:\s+the)?\s+\d+(?:st|nd|rd|th)?(?:\s+of\s+\w+)?', time_string):
         try:
             specific_date = parser.parse(time_string, fuzzy=True)
-            # Go to next year if the month is yet to come.
             block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
             if specific_date.month < block_timestamp.month:
                 specific_date = specific_date.replace(year=specific_date.year + 1)
-            # If specific_date has its time component set to midnight (00:00:00), replace with the hours, minutes, and seconds from block_timestamp
             if specific_date.hour == 0 and specific_date.minute == 0 and specific_date.second == 0:
                 specific_date = specific_date.replace(hour=block_timestamp.hour, minute=block_timestamp.minute, second=block_timestamp.second)
             return specific_date
@@ -118,18 +127,15 @@ def add_to_reminder_list(comment, target_timestamp):
     upcoming_reminders.insert_one(reminder_data)
     print(f"Added reminder for {comment['author']} at {target_timestamp}")
 
-def reply_to_comment(comment, reply_body, increase_count=True):
+def reply_to_comment(hive, comment, reply_body, increase_count=True):
     """Reply to the comment and optionally update user's remindme count."""
     try:
-        # Only check the user in the database if increase_count is True
         if increase_count:
             user = users_collection.find_one({'author': comment['author']})
             if user:
-                # Increment remindme_count if the user exists
                 users_collection.update_one({'author': comment['author']}, {'$inc': {'remindme_count': 1}})
                 print(f"Updated remindme_count for {comment['author']}")
             else:
-                # Add the user if they don't exist with default remindme_count and premium
                 new_user = {'author': comment['author'], 'remindme_count': 1, 'premium': 0}
                 users_collection.insert_one(new_user)
                 print(f"Added new user: {comment['author']}")
@@ -145,8 +151,18 @@ def reply_to_comment(comment, reply_body, increase_count=True):
     except Exception as e:
         print(f"An error occurred while replying: {e}")
 
-def reply_with_error(comment):
-    """Reply with an error message if time parsing fails."""
+def reply_with_error(comment, api_index=0):
+    """Reply with an error message if time parsing fails, with fallback API nodes."""
+    hive = initialize_hive_client(api_index)
     reply_body = get_random_text("parsing_error")
-    reply_to_comment(comment, reply_body, increase_count=False)
+    
+    try:
+        reply_to_comment(hive, comment, reply_body, increase_count=False)
+    except Exception as e:
+        print(f"Error replying with {HIVE_API_NODES[api_index % len(HIVE_API_NODES)]}: {e}")
+        if api_index < len(HIVE_API_NODES) - 1:
+            print("Falling back to next API node...")
+            reply_with_error(comment, api_index + 1)
+        else:
+            print("Failed to reply with all API nodes.")
 
