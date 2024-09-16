@@ -23,7 +23,7 @@ HIVE_API_NODES = [
     'https://api.hive.blog',
     'https://api.deathwing.me',
     'https://api.openhive.network'
-
+]
 
 # Initialize MongoDB client
 client = MongoClient(MONGO_URI)
