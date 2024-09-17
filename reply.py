@@ -88,6 +88,10 @@ def calculate_target_timestamp(block_timestamp, time_string):
             delta = timedelta(days=amount)
         elif 'week' in unit:
             delta = timedelta(weeks=amount)
+        elif 'month' in unit:
+            delta = relativedelta(months=amount)
+        elif 'year' in unit:
+            delta = relativedelta(years=amount)
         else:
             raise ValueError(f"Unknown time unit: {unit}")
 
