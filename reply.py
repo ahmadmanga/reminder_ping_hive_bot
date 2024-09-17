@@ -72,7 +72,7 @@ def calculate_target_timestamp(block_timestamp, time_string):
     time_string = time_string.lower().strip()
         
     # Stage 1: Manual parsing for "in {number} {unit}" pattern
-    match = re.match(r'\bon(?:\s+the)?\s+(?:(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:of\s+)?(\w+)))?,?\s*(\d{4})?', time_string)
+    match = re.match(r'(?:in\s+)?(\d+(?:\.\d+)?)\s*(second[s]?|minute[s]?|hour[s]?|day[s]?|week[s]?|month[s]?|year[s]?)', time_string)
     if match:
         amount = int(match.group(1))
         unit = match.group(2)
@@ -98,7 +98,7 @@ def calculate_target_timestamp(block_timestamp, time_string):
         return target_timestamp
     
     # Stage 2: Parsing with dateutil.parser
-    elif re.search(r'\bon(?:\s+the)?\s+\d+(?:st|nd|rd|th)?(?:\s+of\s+\w+)?', time_string):
+    elif re.search(r'\bon(?:\s+the)?\s+(?:(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:of\s+)?(\w+)))?,?\s*(\d{4})?', time_string):
         try:
             specific_date = parser.parse(time_string, fuzzy=True)
             block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
