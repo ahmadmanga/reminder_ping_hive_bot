@@ -98,11 +98,11 @@ def calculate_target_timestamp(block_timestamp, time_string):
         return target_timestamp
     
     # Stage 2: Parsing with dateutil.parser
-    elif re.search(r'\bon(?:\s+the)?\s+(?:(\w+)\s+(\d{1,2})(?:st|nd|rd|th)?|(\d{1,2})(?:st|nd|rd|th)?(?:\s+(?:of\s+)?(\w+)))?,?\s*(\d{4})?', time_string):
+    elif re.search(r'\bon(?:\s+the)?\s+(?:(\w+),?\s+(\d{1,2})(?:st|nd|rd|th)?,?|(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+(?:of\s+)?(\w+),?))?\s*(\d{4})?', time_string):
         try:
             specific_date = parser.parse(time_string, fuzzy=True)
             block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
-            if specific_date.month < block_timestamp.month:
+            if specific_date.year == block_timestamp.year and specific_date.month < block_timestamp.month:
                 specific_date = specific_date.replace(year=specific_date.year + 1)
             if specific_date.hour == 0 and specific_date.minute == 0 and specific_date.second == 0:
                 specific_date = specific_date.replace(hour=block_timestamp.hour, minute=block_timestamp.minute, second=block_timestamp.second)
