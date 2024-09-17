@@ -143,7 +143,7 @@ def reply_to_comment(hive, comment, reply_body, increase_count=True):
         # Reply to the comment on Hive        
         comment_obj = Comment(f"@{comment['author']}/{comment['permlink']}", steem_instance=hive)
         reply = comment_obj.reply(body=reply_body, author=HIVE_USER)
-        print(f"Replied with comment: {reply['permlink']}")
+        print(f"Replied with comment: {comment['permlink']}")
         time.sleep(3)
         
     except ContentDoesNotExistsException:
