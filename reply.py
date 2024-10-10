@@ -72,10 +72,11 @@ def calculate_target_timestamp(block_timestamp, time_string):
     time_string = time_string.lower().strip()
         
     # Stage 1: Manual parsing for "in {number} {unit}" pattern
-match = re.match(
+    match = re.match(
         r'(?:in\s+)?(\d+(?:\.\d+)?|\d+:\d+)\s*(second[s]?|sec[s]?|minute[s]?|min[s]?|hour[s]?|hr[s]?|day[s]?|week[s]?|month[s]?|moon[s]?|year[s]?)(?:\s+and\s+(\d+(?:\.\d+)?|\d+:\d+)\s*(second[s]?|sec[s]?|minute[s]?|min[s]?|hour[s]?|hr[s]?|day[s]?|week[s]?|month[s]?|moon[s]?|year[s]?))?',
         time_string
     )
+    
     
     if match:
         # First amount and unit
@@ -140,6 +141,67 @@ match = re.match(
         target_timestamp = block_timestamp + delta
         return target_timestamp
     
+    # Stage 1.5: Parsing for relative time expressions
+    # Stage 1.5: Parsing for relative time expressions
+    elif re.search(r'^(tomorrow|next\s+(?:\w+|(?:hour[s]?|day[s]?|week[s]?|month[s]?|year[s]?|(?:mon|tues|wed|thurs|fri|sat|sun)[a-z]*)))(?:\s+at\s+(\d{1,2}):(\d{2}))?$', time_string):
+        today = datetime.utcnow()
+        target_date = today
+
+        if "tomorrow" in time_string:
+            target_date += timedelta(days=1)
+            
+        elif "next" in time_string:
+            # Handling time units like hour, day, week, month, and year
+            if any(unit in time_string for unit in ["hour", "day", "week", "month", "year"]):
+                if "hour" in time_string:
+                    target_date += timedelta(hours=1)
+                elif "day" in time_string:
+                    target_date += timedelta(days=1)
+                elif "week" in time_string:
+                    target_date += timedelta(weeks=1)
+                elif "month" in time_string:
+                    target_date += timedelta(days=30)  # Approximate 1 month as 30 days
+                elif "year" in time_string:
+                    target_date += timedelta(days=365)  # Approximate 1 year as 365 days
+            else:
+                # Handling day names including abbreviated forms
+                days_of_week = {
+                    'monday': 0, 'mon': 0,
+                    'tuesday': 1, 'tue': 1,
+                    'wednesday': 2, 'wed': 2,
+                    'thursday': 3, 'thu': 3,
+                    'friday': 4, 'fri': 4,
+                    'saturday': 5, 'sat': 5,
+                    'sunday': 6, 'sun': 6
+                }
+                for dayname in days_of_week:
+                    if dayname in time_string.lower():
+                        days_ahead = (days_of_week[dayname] - today.weekday() + 7) % 7
+                        if days_ahead == 0:  # If the day is today, get next week's day
+                            days_ahead = 7
+                        target_date += timedelta(days=days_ahead)
+                        break
+
+        # Optional "at X" handling
+        at_match = re.search(r'at\s+(\d{1,2}):(\d{2})', time_string)
+        
+        if at_match:
+           try:
+                hour = int(at_match.group(1))
+                minute = int(at_match.group(2))
+
+                # Validate hour and minute ranges
+                if 0 <= hour < 24 and 0 <= minute < 60:
+                    target_date = target_date.replace(hour=hour, minute=minute, second=0)
+                else:
+                    print(f"Invalid time specified: {hour}:{minute}")
+           except (ValueError, IndexError) as e:
+                print(f"Failed to parse time at clause: {e}")
+        
+        # Return the target_date if found in Stage 1.5   
+        return target_date
+
+    
     # Stage 2: Parsing with dateutil.parser
     elif re.search(r'\b(?:on|at)\s+(?:the\s+)?(?:(\w+),?\s+(\d{1,2})(?:st|nd|rd|th)?,?|(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+(?:of\s+)?(\w+),?))?\s*(\d{4})?', time_string):
        try:
@@ -151,8 +213,8 @@ match = re.match(
           #   specific_date = specific_date.replace(hour=block_timestamp.hour, minute=block_timestamp.minute, second=block_timestamp.second)
              
           return specific_date
-    except (ValueError, OverflowError):
-        pass
+       except (ValueError, OverflowError):
+          pass
             
     # Stage 3: Return None if unable to parse
     return None
