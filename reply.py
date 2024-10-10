@@ -72,47 +72,87 @@ def calculate_target_timestamp(block_timestamp, time_string):
     time_string = time_string.lower().strip()
         
     # Stage 1: Manual parsing for "in {number} {unit}" pattern
-    match = re.match(r'(?:in\s+)?(\d+(?:\.\d+)?)\s*(second[s]?|minute[s]?|hour[s]?|day[s]?|week[s]?|month[s]?|year[s]?)', time_string)
+match = re.match(
+        r'(?:in\s+)?(\d+(?:\.\d+)?|\d+:\d+)\s*(second[s]?|sec[s]?|minute[s]?|min[s]?|hour[s]?|hr[s]?|day[s]?|week[s]?|month[s]?|moon[s]?|year[s]?)(?:\s+and\s+(\d+(?:\.\d+)?|\d+:\d+)\s*(second[s]?|sec[s]?|minute[s]?|min[s]?|hour[s]?|hr[s]?|day[s]?|week[s]?|month[s]?|moon[s]?|year[s]?))?',
+        time_string
+    )
+    
     if match:
-        amount = int(match.group(1))
-        unit = match.group(2)
-
-        # Time delta calculation based on unit
-        if 'second' in unit:
-            delta = timedelta(seconds=amount)
-        elif 'minute' in unit:
-            delta = timedelta(minutes=amount)
-        elif 'hour' in unit:
-            delta = timedelta(hours=amount)
-        elif 'day' in unit:
-            delta = timedelta(days=amount)
-        elif 'week' in unit:
-            delta = timedelta(weeks=amount)
-        elif 'month' in unit:
-            delta = timedelta(days=amount * 30)  # Approximate 1 month as 30 days
-        elif 'year' in unit:
-            delta = timedelta(days=amount * 365)  # Approximate 1 year as 365 days
+        # First amount and unit
+        amount1, unit1 = match.group(1), match.group(2)
+        # Parse the first amount, handling fractional and time format (1:30 hours)
+        if ':' in amount1:
+            hours, minutes = map(float, amount1.split(':'))
+            amount1 = hours + minutes / 60
         else:
-            raise ValueError(f"Unknown time unit: {unit}")
+            amount1 = float(amount1)
+        
+        # Second amount and unit (if present)
+        amount2 = float(match.group(4)) if match.group(3) else 0
+        unit2 = match.group(4) if match.group(4) else None
+        
+        # Parse the second amount if provided
+        if unit2:
+            if ':' in amount2:
+                hours, minutes = map(float, amount2.split(':'))
+                amount2 = hours + minutes / 60
+            else:
+                amount2 = float(amount2)
 
+        # Time delta calculation based on units
+        delta = timedelta()
+        
+        # Calculate delta for the first unit
+        if 'second' in unit1 or 'sec' in unit1:
+            delta += timedelta(seconds=amount1)
+        elif 'minute' in unit1 or 'min' in unit1:
+            delta += timedelta(minutes=amount1)
+        elif 'hour' in unit1 or 'hr' in unit1:
+            delta += timedelta(hours=amount1)
+        elif 'day' in unit1:
+            delta += timedelta(days=amount1)
+        elif 'week' in unit1:
+            delta += timedelta(weeks=amount1)
+        elif 'month' in unit1 or 'moon' in unit1:
+            delta += timedelta(days=amount1 * 30)  # Approximate 1 month as 30 days
+        elif 'year' in unit1:
+            delta += timedelta(days=amount1 * 365)  # Approximate 1 year as 365 days
+        
+        # Repeat for the second unit if present
+        if unit2:
+            if 'second' in unit2 or 'sec' in unit2:
+                delta += timedelta(seconds=amount2)
+            elif 'minute' in unit2 or 'min' in unit2:
+                delta += timedelta(minutes=amount2)
+            elif 'hour' in unit2 or 'hr' in unit2:
+                delta += timedelta(hours=amount2)
+            elif 'day' in unit2:
+                delta += timedelta(days=amount2)
+            elif 'week' in unit2:
+                delta += timedelta(weeks=amount2)
+            elif 'month' in unit2 or 'moon' in unit2:
+                delta += timedelta(days=amount2 * 30)
+            elif 'year' in unit2:
+                delta += timedelta(days=amount2 * 365)
+        
         # Convert block timestamp to datetime
         block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
         target_timestamp = block_timestamp + delta
-
         return target_timestamp
     
     # Stage 2: Parsing with dateutil.parser
-    elif re.search(r'\bon(?:\s+the)?\s+(?:(\w+),?\s+(\d{1,2})(?:st|nd|rd|th)?,?|(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+(?:of\s+)?(\w+),?))?\s*(\d{4})?', time_string):
-        try:
-            specific_date = parser.parse(time_string, fuzzy=True)
-            block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
-            if specific_date.year == block_timestamp.year and specific_date.month < block_timestamp.month:
-                specific_date = specific_date.replace(year=specific_date.year + 1)
-            if specific_date.hour == 0 and specific_date.minute == 0 and specific_date.second == 0:
-                specific_date = specific_date.replace(hour=block_timestamp.hour, minute=block_timestamp.minute, second=block_timestamp.second)
-            return specific_date
-        except (ValueError, OverflowError):
-            pass
+    elif re.search(r'\b(?:on|at)\s+(?:the\s+)?(?:(\w+),?\s+(\d{1,2})(?:st|nd|rd|th)?,?|(\d{1,2})(?:st|nd|rd|th)?,?(?:\s+(?:of\s+)?(\w+),?))?\s*(\d{4})?', time_string):
+       try:
+          specific_date = parser.parse(time_string, fuzzy=True)
+          block_timestamp = datetime.strptime(block_timestamp, '%Y-%m-%dT%H:%M:%S')
+          if specific_date.year == block_timestamp.year and specific_date.month < block_timestamp.month:
+             specific_date = specific_date.replace(year=specific_date.year + 1)
+          #if specific_date.hour == 0 and specific_date.minute == 0 and specific_date.second == 0:
+          #   specific_date = specific_date.replace(hour=block_timestamp.hour, minute=block_timestamp.minute, second=block_timestamp.second)
+             
+          return specific_date
+    except (ValueError, OverflowError):
+        pass
             
     # Stage 3: Return None if unable to parse
     return None
